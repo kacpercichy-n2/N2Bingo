@@ -47,4 +47,35 @@ Dwie tabele w projekcie Supabase `N2Hub`:
 - `bingo_marks` — `(day, phrase_id)` unikalne, plus `player_id`
 - `bingo_lines` — `(day, line_key)` unikalne, plus `completed_by`
 
-Obie z RLS i policy dla `anon` — wewnętrzna zabawka, kto ma link, ten gra.
+Obie mają `REPLICA IDENTITY FULL`. To nie jest kosmetyka: przy domyślnym ustawieniu
+Postgres wysyła przy `DELETE` tylko klucz główny, więc subskrypcja realtime
+filtrowana po `day=eq.` **nigdy nie dostawała eventów usunięcia** — odznaczone
+pole zostawało u pozostałych graczy na zawsze i blokowało im kliknięcie.
+
+### Uprawnienia
+
+Odczyt jest otwarty. Zapisy są ograniczone politykami RLS:
+
+- wpis tylko na **dzisiejszy** dzień warszawski i tylko dla znanego `player_id`
+- `bingo_marks` można usuwać wyłącznie z dzisiejszej planszy
+- `bingo_lines` nie ma polityki `UPDATE` ani `DELETE` — **raz zdobyte bingo jest
+  trwałe**, nikt nie przepisze go na siebie ani nie skasuje historii
+
+Świadomie przyjęte ryzyko: kluczem publicznym da się usunąć cudzy znacznik z
+dzisiejszej planszy. Bez logowania nie istnieje reguła RLS, która to zablokuje —
+klucz anonimowy nie ma jak udowodnić, kim jest. Interfejs na to nie pozwala,
+konsola przeglądarki tak. Dla zabawki na cztery osoby to akceptowalne.
+
+## Współbieżność
+
+Czterech graczy dzieli jedną planszę, więc kod jest pisany pod wyścigi:
+
+- każde pole ma strażnika „w locie" — drugi klik w trakcie pierwszego jest
+  ignorowany, a spóźnione odpowiedzi nie wskrzeszają nieaktualnego stanu
+- `load()` **scala** zamiast podmieniać i uruchamia się z callbacku `SUBSCRIBED`,
+  więc każdy reconnect sam dociąga to, co przepadło (realtime nie robi backfillu)
+- konfetti leci od razu, ale **zapis linii czeka**, aż wszystkie znaczniki w niej
+  będą prawdziwymi wierszami z serwera — inaczej każda karta uważałaby za autora
+  siebie i bingo trafiałoby do złej osoby
+- `Game` jest montowany z `key={day}`, więc północ czyści stan zamiast malować
+  wczorajsze znaczniki na nowej planszy

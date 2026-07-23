@@ -11,7 +11,6 @@ if (!url || !key) {
 
 export const supabase = createClient(url, key, {
   auth: { persistSession: false },
-  realtime: { params: { eventsPerSecond: 5 } },
 })
 
 export type MarkRow = {

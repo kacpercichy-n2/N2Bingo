@@ -13,7 +13,7 @@ export type Stats = {
  * The whole history is a few thousand rows at most, so pull it once and
  * aggregate in the browser rather than maintaining SQL views.
  */
-export function useStats(refreshKey: unknown): Stats {
+export function useStats(...refreshKeys: unknown[]): Stats {
   const [marks, setMarks] = useState<MarkRow[]>([])
   const [lines, setLines] = useState<LineRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -22,9 +22,10 @@ export function useStats(refreshKey: unknown): Stats {
 
   const reload = useCallback(() => setNonce((n) => n + 1), [])
 
+  const keySignature = refreshKeys.join('|')
+
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
 
     void (async () => {
       const [marksRes, linesRes] = await Promise.all([
@@ -34,7 +35,7 @@ export function useStats(refreshKey: unknown): Stats {
       if (cancelled) return
 
       if (marksRes.error || linesRes.error) {
-        setError(marksRes.error?.message ?? linesRes.error?.message ?? 'Błąd statystyk')
+        setError('Nie udało się policzyć statystyk. Sprawdź połączenie.')
       } else {
         setError(null)
         setMarks(marksRes.data as MarkRow[])
@@ -46,7 +47,7 @@ export function useStats(refreshKey: unknown): Stats {
     return () => {
       cancelled = true
     }
-  }, [nonce, refreshKey])
+  }, [nonce, keySignature])
 
   return { marks, lines, loading, error, reload }
 }

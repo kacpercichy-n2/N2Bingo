@@ -9,11 +9,12 @@ type Props = {
   board: Board
   marks: Map<string, MarkRow>
   me: Player
+  pending: ReadonlySet<string>
   onToggle: (phraseId: string) => void
   disabled?: boolean
 }
 
-export function BingoBoard({ board, marks, me, onToggle, disabled }: Props) {
+export function BingoBoard({ board, marks, me, pending, onToggle, disabled }: Props) {
   const markedIds = useMemo(() => new Set(marks.keys()), [marks])
 
   const winningIndices = useMemo(() => {
@@ -26,17 +27,34 @@ export function BingoBoard({ board, marks, me, onToggle, disabled }: Props) {
     return set
   }, [board, markedIds])
 
-  // Track which cells changed since last render so only those animate.
-  const previous = useRef<Set<string>>(new Set())
+  // Track which cells changed since last render so only those animate. The
+  // first non-empty snapshot is adopted silently, otherwise every already
+  // marked cell would stamp itself on page load.
+  const previous = useRef<Set<string> | null>(null)
   const [justMarked, setJustMarked] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const added = [...markedIds].filter((id) => !previous.current.has(id))
+    if (previous.current === null) {
+      previous.current = new Set(markedIds)
+      return
+    }
+
+    const added = [...markedIds].filter((id) => !previous.current!.has(id))
     previous.current = new Set(markedIds)
     if (added.length === 0) return
 
-    setJustMarked(new Set(added))
-    const t = setTimeout(() => setJustMarked(new Set()), 400)
+    // Union, so a second mark arriving mid-animation does not cut the first
+    // one short; each id clears on its own timer.
+    setJustMarked((prev) => new Set([...prev, ...added]))
+    const t = setTimeout(
+      () =>
+        setJustMarked((prev) => {
+          const next = new Set(prev)
+          added.forEach((id) => next.delete(id))
+          return next
+        }),
+      400,
+    )
     return () => clearTimeout(t)
   }, [markedIds])
 
@@ -68,12 +86,13 @@ export function BingoBoard({ board, marks, me, onToggle, disabled }: Props) {
         }
 
         const mine = owner?.id === me.id
+        const busy = pending.has(cell.id)
 
         return (
           <button
             key={cell.id}
             onClick={() => onToggle(cell.id)}
-            disabled={disabled || (!!owner && !mine)}
+            disabled={disabled || busy || (!!owner && !mine)}
             title={owner ? `Zaznaczył(a): ${owner.name}` : 'Kliknij, żeby zaznaczyć'}
             className={cn(
               'group relative grid aspect-square place-items-center overflow-hidden rounded-xl p-2 text-center transition-all duration-150 sm:p-3',
@@ -82,6 +101,7 @@ export function BingoBoard({ board, marks, me, onToggle, disabled }: Props) {
                 ? 'shadow-lg'
                 : 'bg-card hover:bg-accent border-border hover:border-primary/40 border active:scale-[0.97]',
               !!owner && !mine && 'cursor-not-allowed',
+              busy && 'cursor-progress opacity-80',
               justMarked.has(cell.id) && 'animate-stamp',
             )}
             style={

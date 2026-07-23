@@ -26,27 +26,51 @@ export function prettyDay(day: string): string {
   return prettyDayFormatter.format(new Date(`${day}T12:00:00Z`))
 }
 
-/** Milliseconds until the Warsaw day rolls over. */
+/**
+ * Milliseconds until the Warsaw day rolls over.
+ *
+ * Steps forward in hours to find the boundary, then binary-searches to the
+ * second. Comparing formatted day strings (rather than doing offset maths)
+ * keeps this correct across both DST transitions. Called once a second, so it
+ * deliberately avoids the minute-by-minute scan it used to do.
+ */
 export function msUntilNextDay(now: Date = new Date()): number {
+  const start = now.getTime()
   const current = dayKey(now)
-  // Probe forward in 10-minute steps from the next hour; cheap and DST-proof.
-  let probe = now.getTime() + 60_000
-  const limit = now.getTime() + 26 * 60 * 60 * 1000
-  while (probe < limit) {
+
+  let lo = start
+  let hi = 0
+  for (let hours = 1; hours <= 26; hours++) {
+    const probe = start + hours * 3_600_000
     if (dayKey(new Date(probe)) !== current) {
-      // Narrow down to the second.
-      let lo = probe - 60_000
-      let hi = probe
-      while (hi - lo > 1000) {
-        const mid = Math.floor((lo + hi) / 2)
-        if (dayKey(new Date(mid)) === current) lo = mid
-        else hi = mid
-      }
-      return Math.max(0, hi - now.getTime())
+      hi = probe
+      break
     }
-    probe += 60_000
+    lo = probe
   }
-  return 60_000
+  if (!hi) return 3_600_000
+
+  while (hi - lo > 1000) {
+    const mid = Math.floor((lo + hi) / 2)
+    if (dayKey(new Date(mid)) === current) lo = mid
+    else hi = mid
+  }
+  return Math.max(0, hi - start)
+}
+
+/** Start of a Warsaw day as an absolute instant — for "how fast was it" maths. */
+export function dayStart(day: string): Date {
+  // Midday UTC is inside the target day for every European offset; walk back to
+  // the first instant that still formats as `day`.
+  const noon = new Date(`${day}T12:00:00Z`).getTime()
+  let lo = noon - 36 * 3_600_000
+  let hi = noon
+  while (hi - lo > 1000) {
+    const mid = Math.floor((lo + hi) / 2)
+    if (dayKey(new Date(mid)) === day) hi = mid
+    else lo = mid
+  }
+  return new Date(hi)
 }
 
 function hashSeed(input: string): number {
@@ -139,6 +163,11 @@ export function buildLines(size: number): Line[] {
   })
 
   return lines
+}
+
+/** Human label for a stored `line_key`, e.g. `row-2` → `Rząd 3`. */
+export function lineLabel(key: string, size = 4): string {
+  return buildLines(size).find((l) => l.key === key)?.label ?? key
 }
 
 /** Line keys where every cell is marked (free cells always count). */

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { prettyDay, TIMEZONE } from '@/lib/board'
+import { dayStart, prettyDay, TIMEZONE } from '@/lib/board'
 import { PHRASES_BY_ID } from '@/lib/phrases'
 import { getPlayer, PLAYERS } from '@/lib/players'
 import { useStats } from '@/lib/useStats'
@@ -26,8 +26,8 @@ function StatTile({ value, label, hint }: { value: string; label: string; hint?:
   )
 }
 
-export function Stats({ today }: { today: string }) {
-  const { marks, lines, loading, error } = useStats(today)
+export function Stats({ today, liveKey }: { today: string; liveKey?: string }) {
+  const { marks, lines, loading, error } = useStats(today, liveKey)
 
   const data = useMemo(() => {
     const byPlayer = new Map<string, { marks: number; bingos: number; days: Set<string> }>()
@@ -78,14 +78,16 @@ export function Stats({ today }: { today: string }) {
       }
     })
 
+    // Elapsed time is measured from Warsaw midnight, not UTC — otherwise a
+    // summer day (UTC+2) looks an hour slower than a winter one (UTC+1).
+    const elapsed = (d: (typeof byDay)[number]) =>
+      d.firstBingoAt ? d.firstBingoAt.getTime() - dayStart(d.day).getTime() : Infinity
+
     const daysWithBingo = byDay.filter((d) => d.bingos > 0)
-    const fastest = daysWithBingo.reduce<(typeof byDay)[number] | null>((best, d) => {
-      if (!d.firstBingoAt) return best
-      const dayStart = new Date(`${d.day}T00:00:00Z`).getTime()
-      const bestStart = best?.firstBingoAt ? new Date(`${best.day}T00:00:00Z`).getTime() : 0
-      if (!best?.firstBingoAt) return d
-      return d.firstBingoAt.getTime() - dayStart < best.firstBingoAt.getTime() - bestStart ? d : best
-    }, null)
+    const fastest = daysWithBingo.reduce<(typeof byDay)[number] | null>(
+      (best, d) => (!best || elapsed(d) < elapsed(best) ? d : best),
+      null,
+    )
 
     const ranking = PLAYERS.map((p) => ({ player: p, ...byPlayer.get(p.id)! })).sort(
       (a, b) => b.marks - a.marks || b.bingos - a.bingos,
