@@ -32,6 +32,7 @@ export const PHRASES: Phrase[] = [
   { id: 'uwu-na-spotkaniu', text: 'UwU na spotkaniu' },
   { id: 'ogarniemy-po-hotelu', text: 'Ogarniemy po hotelu' },
   { id: 'glupi-pomysl', text: '„Mam głupi pomysł”' },
+  { id: 'przetarg-z-pizdy', text: 'Przetarg z pizdy — nie wiadomo o chuj chodzi?' },
 ]
 
 export const PHRASES_BY_ID: Record<string, Phrase> = Object.fromEntries(
