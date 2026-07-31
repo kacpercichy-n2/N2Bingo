@@ -9,8 +9,14 @@ if (!url || !key) {
   )
 }
 
+// N2Bingo is its own schema in the shared N2Hub project, next to n2click /
+// clarity / blogoapp. Every `from()` below resolves inside it -- there is
+// nothing of ours in `public`.
+export const SCHEMA = 'n2bingo'
+
 export const supabase = createClient(url, key, {
   auth: { persistSession: false },
+  db: { schema: SCHEMA },
 })
 
 export type MarkRow = {

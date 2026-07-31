@@ -42,10 +42,22 @@ Przy 24+ hasłach plansza sama przechodzi z 4×4 na klasyczne 5×5 z wolnym pole
 
 ## Baza
 
-Dwie tabele w projekcie Supabase `N2Hub`:
+N2Bingo dzieli projekt Supabase `N2Hub` z resztą aplikacji, ale ma tam własny
+schemat `n2bingo` — tak samo jak `n2click`, `clarity` czy `blogoapp`. Nic naszego
+nie leży w `public`, a klient jest przypięty do schematu raz, w
+[`src/lib/supabase.ts`](src/lib/supabase.ts) (`db: { schema }`), więc `from()`
+używa gołych nazw tabel.
 
-- `bingo_marks` — `(day, phrase_id)` unikalne, plus `player_id`
-- `bingo_lines` — `(day, line_key)` unikalne, plus `completed_by`
+Realtime jest wyjątkiem: nie dziedziczy `db.schema`, bo czyta WAL i dopasowuje po
+nazwie schematu, więc w subskrypcji trzeba ją podać wprost.
+
+Dwie tabele:
+
+- `n2bingo.bingo_marks` — `(day, phrase_id)` unikalne, plus `player_id`
+- `n2bingo.bingo_lines` — `(day, line_key)` unikalne, plus `completed_by`
+
+Schemat musi być wystawiony w **Dashboard → Settings → API → Exposed schemas**,
+inaczej PostgREST odpowiada `406` na każde zapytanie.
 
 Obie mają `REPLICA IDENTITY FULL`. To nie jest kosmetyka: przy domyślnym ustawieniu
 Postgres wysyła przy `DELETE` tylko klucz główny, więc subskrypcja realtime
@@ -53,6 +65,11 @@ filtrowana po `day=eq.` **nigdy nie dostawała eventów usunięcia** — odznacz
 pole zostawało u pozostałych graczy na zawsze i blokowało im kliknięcie.
 
 ### Uprawnienia
+
+Rola `anon` ma na tabelach dokładnie tyle, ile potrzeba: `SELECT` + `INSERT` na
+obu, `DELETE` tylko na `bingo_marks`. Nie jest to duplikat RLS — `TRUNCATE` w
+ogóle nie przechodzi przez polityki, więc odebranie granta to jedyne, co chroni
+historię przed skasowaniem jednym zapytaniem.
 
 Odczyt jest otwarty. Zapisy są ograniczone politykami RLS:
 

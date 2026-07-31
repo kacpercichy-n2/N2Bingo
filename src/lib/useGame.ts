@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buildBoard, completedLines, type Board, type Line } from './board'
-import { supabase, type LineRow, type MarkRow } from './supabase'
+import { SCHEMA, supabase, type LineRow, type MarkRow } from './supabase'
 
 export type GameState = {
   board: Board
@@ -121,7 +121,9 @@ export function useGame(day: string, playerId: string | null): GameState {
       .channel(`bingo:${day}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'bingo_marks', filter: `day=eq.${day}` },
+        // Realtime does not inherit the client's `db.schema` — it reads the WAL
+        // and matches on the literal schema name, so it has to be spelled out.
+        { event: '*', schema: SCHEMA, table: 'bingo_marks', filter: `day=eq.${day}` },
         (payload) => {
           setMarks((prev) => {
             const next = new Map(prev)
@@ -145,7 +147,7 @@ export function useGame(day: string, playerId: string | null): GameState {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'bingo_lines', filter: `day=eq.${day}` },
+        { event: '*', schema: SCHEMA, table: 'bingo_lines', filter: `day=eq.${day}` },
         (payload) => {
           if (payload.eventType === 'DELETE') return
           const row = payload.new as LineRow
