@@ -33,6 +33,14 @@ export const PHRASES: Phrase[] = [
   { id: 'ogarniemy-po-hotelu', text: 'Ogarniemy po hotelu' },
   { id: 'glupi-pomysl', text: '„Mam głupi pomysł”' },
   { id: 'przetarg-z-pizdy', text: 'Przetarg z pizdy — nie wiadomo o chuj chodzi?' },
+  { id: 'kamil-kolka-telefon', text: 'Kamil kręci kółka gadając przez telefon' },
+  { id: 'spotkanie-opoznione', text: 'Stałe spotkanie opóźnione o min. 0,5h' },
+  { id: 'montazu-nie-ma', text: 'Montażu nie ma i nie będzie' },
+  { id: 'zbysiu-kura', text: 'Zbysiu dokupuje 7 kg kury' },
+  { id: 'dominik-ekspres', text: 'Dominik napastuje ekspres' },
+  { id: 'dominik-4-kawa', text: 'Dominik wypija 4. kawę' },
+  { id: 'emotional-damage', text: 'Emotional Damage' },
+  { id: 'cos-plonie', text: 'Coś płonie w biurze' },
 ]
 
 export const PHRASES_BY_ID: Record<string, Phrase> = Object.fromEntries(
